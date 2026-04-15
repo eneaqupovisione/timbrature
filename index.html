@@ -32,25 +32,16 @@
     .actions-row { display: flex; gap: 8px; margin-top: 1rem; }
     .btn-sm { flex: 1; padding: 10px; font-size: 13px; border-radius: 10px; border: 1px solid #ddd; background: #fff; color: #333; cursor: pointer; font-weight: 500; }
     .btn-sm:active { background: #f0f0f0; }
-    .config-section { background: #fff; border-radius: 14px; padding: 1rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .config-section label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px; }
-    .config-section p { font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 10px; }
-    .config-row { display: flex; gap: 6px; align-items: center; }
-    .config-row input { flex: 1; padding: 9px 10px; font-size: 12px; font-family: monospace; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
-    .config-row button { padding: 9px 14px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-weight: 500; white-space: nowrap; }
-    .sync-status { font-size: 11px; color: #888; margin-top: 6px; }
+    .sync-status { font-size: 12px; color: #888; margin-top: 1rem; text-align: center; }
     .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 999; }
     .toast.show { opacity: 1; }
     @media (prefers-color-scheme: dark) {
       body { background: #1a1a1a; color: #f0f0f0; }
-      .status-card, .log-table, .config-section { background: #2a2a2a; box-shadow: none; }
+      .status-card, .log-table, .log-empty { background: #2a2a2a; box-shadow: none; }
       .log-table th { background: #222; color: #888; border-bottom-color: #333; }
       .log-table td { border-bottom-color: #333; }
-      .log-empty { background: #2a2a2a; color: #666; }
       .btn-disabled { background: #333; color: #666; }
       .btn-sm { background: #2a2a2a; border-color: #444; color: #ccc; }
-      .config-row input { background: #222; border-color: #444; color: #f0f0f0; }
-      .config-row button { background: #2a2a2a; border-color: #444; color: #ccc; }
       .badge-off { background: #333; color: #888; }
       .toast { background: #f0f0f0; color: #1a1a1a; }
     }
@@ -83,15 +74,7 @@
     <button class="btn-sm" onclick="clearLog()">Svuota log</button>
   </div>
 
-  <div class="config-section" style="margin-top: 1.5rem;">
-    <label>Google Sheets</label>
-    <p>URL Apps Script per sincronizzazione automatica al clock-out</p>
-    <div class="config-row">
-      <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/...">
-      <button onclick="saveScriptUrl()">Salva</button>
-    </div>
-    <div class="sync-status" id="sync-status"></div>
-  </div>
+  <div class="sync-status" id="sync-status"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -99,7 +82,15 @@
 <script>
   const STORAGE_KEY = 'timbratura_state';
   const LOG_KEY = 'timbratura_log';
-  const SCRIPT_URL_KEY = 'timbratura_script_url';
+
+  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeelrBFmLTZs9Iw3fj8WXQHrsCkdDkh3AJ01cYn7pIEUjv72w/formResponse';
+  const FORM_FIELDS = {
+    data: 'entry.2130742935',
+    entrata: 'entry.1502101229',
+    uscita: 'entry.199129023',
+    durata: 'entry.2099328213',
+    minuti: 'entry.877315540'
+  };
 
   function getState() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { active: false, startTs: null }; }
@@ -111,7 +102,6 @@
     catch { return []; }
   }
   function saveLog(log) { localStorage.setItem(LOG_KEY, JSON.stringify(log)); }
-  function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_KEY) || ''; }
 
   function pad(n) { return String(n).padStart(2, '0'); }
   function formatTs(ts) {
@@ -167,11 +157,6 @@
       clearInterval(timerInterval);
     }
     renderLog();
-    const url = getScriptUrl();
-    if (url) {
-      document.getElementById('script-url').value = url;
-      document.getElementById('sync-status').textContent = 'Sincronizzazione attiva';
-    }
   }
 
   function clockIn() {
@@ -193,8 +178,7 @@
     setState({ active: false, startTs: null });
     updateUI();
     showToast('Uscita: ' + formatDuration(duration));
-    const url = getScriptUrl();
-    if (url) await syncToSheets(entry, url);
+    await syncToForm(entry);
   }
 
   function renderLog() {
@@ -235,26 +219,19 @@
     showToast('Log svuotato');
   }
 
-  function saveScriptUrl() {
-    const url = document.getElementById('script-url').value.trim();
-    localStorage.setItem(SCRIPT_URL_KEY, url);
-    document.getElementById('sync-status').textContent = url ? 'Sincronizzazione attiva' : 'URL rimosso';
-    showToast('Salvato');
-  }
-
-  async function syncToSheets(entry, url) {
+  async function syncToForm(entry) {
     try {
       const params = new URLSearchParams({
-        data: new Date(entry.start).toLocaleDateString('it-IT'),
-        entrata: new Date(entry.start).toLocaleTimeString('it-IT'),
-        uscita: new Date(entry.end).toLocaleTimeString('it-IT'),
-        durata: formatDuration(entry.duration),
-        durata_minuti: Math.round(entry.duration / 60000)
+        [FORM_FIELDS.data]: new Date(entry.start).toLocaleDateString('it-IT'),
+        [FORM_FIELDS.entrata]: new Date(entry.start).toLocaleTimeString('it-IT'),
+        [FORM_FIELDS.uscita]: new Date(entry.end).toLocaleTimeString('it-IT'),
+        [FORM_FIELDS.durata]: formatDuration(entry.duration),
+        [FORM_FIELDS.minuti]: Math.round(entry.duration / 60000)
       });
-      await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
-      document.getElementById('sync-status').textContent = 'Ultima sync: ' + new Date().toLocaleTimeString('it-IT');
+      await fetch(FORM_URL + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
+      document.getElementById('sync-status').textContent = 'Sincronizzato: ' + new Date().toLocaleTimeString('it-IT');
     } catch(e) {
-      document.getElementById('sync-status').textContent = 'Errore — dati salvati in locale';
+      document.getElementById('sync-status').textContent = 'Errore sync — dati salvati in locale';
     }
   }
 
