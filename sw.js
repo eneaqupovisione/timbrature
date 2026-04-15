@@ -1,5 +1,5 @@
 const CACHE = 'timbrature-v1';
-const FILES = ['/', '/index.html'];
+const FILES = ['/index.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
