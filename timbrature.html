@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timbrature</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; }
+    .wrap { padding: 1.5rem 1rem; max-width: 420px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 2rem; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header p { font-size: 13px; color: #666; margin-top: 4px; }
+    .status-card { background: #fff; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .status-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .status-badge { display: inline-block; font-size: 13px; font-weight: 500; padding: 4px 14px; border-radius: 8px; margin-bottom: 1rem; }
+    .badge-off { background: #f0f0f0; color: #666; }
+    .badge-on { background: #e6f7f0; color: #1a7a4a; }
+    .elapsed { font-size: 40px; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+    .start-time { font-size: 13px; color: #888; margin-top: 6px; }
+    .btn { display: block; width: 100%; padding: 16px; border-radius: 14px; font-size: 17px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s, transform 0.1s; }
+    .btn:active { opacity: 0.8; transform: scale(0.98); }
+    .btn-in { background: #1D9E75; color: #fff; margin-bottom: 1rem; }
+    .btn-out { background: #D85A30; color: #fff; margin-bottom: 1rem; }
+    .btn-disabled { background: #e8e8e8; color: #aaa; margin-bottom: 1rem; cursor: not-allowed; }
+    .section-title { font-size: 13px; color: #888; margin-bottom: 10px; font-weight: 500; }
+    .log-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .log-table th { text-align: left; color: #999; font-weight: 500; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+    .log-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+    .log-table tr:last-child td { border-bottom: none; }
+    .log-empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; background: #fff; border-radius: 12px; }
+    .actions-row { display: flex; gap: 8px; margin-top: 1rem; }
+    .btn-sm { flex: 1; padding: 10px; font-size: 13px; border-radius: 10px; border: 1px solid #ddd; background: #fff; color: #333; cursor: pointer; font-weight: 500; }
+    .btn-sm:active { background: #f0f0f0; }
+    .config-section { background: #fff; border-radius: 14px; padding: 1rem; margin-top: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .config-section label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px; }
+    .config-section p { font-size: 12px; color: #888; line-height: 1.5; margin-bottom: 10px; }
+    .config-row { display: flex; gap: 6px; align-items: center; }
+    .config-row input { flex: 1; padding: 9px 10px; font-size: 12px; font-family: monospace; border: 1px solid #ddd; border-radius: 8px; background: #fafafa; }
+    .config-row button { padding: 9px 14px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-weight: 500; white-space: nowrap; }
+    .sync-status { font-size: 11px; color: #888; margin-top: 6px; }
+    .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 999; }
+    .toast.show { opacity: 1; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a1a; color: #f0f0f0; }
+      .status-card, .log-table, .config-section { background: #2a2a2a; box-shadow: none; }
+      .log-table th { background: #222; color: #888; border-bottom-color: #333; }
+      .log-table td { border-bottom-color: #333; }
+      .log-empty { background: #2a2a2a; color: #666; }
+      .btn-disabled { background: #333; color: #666; }
+      .btn-sm { background: #2a2a2a; border-color: #444; color: #ccc; }
+      .config-row input { background: #222; border-color: #444; color: #f0f0f0; }
+      .config-row button { background: #2a2a2a; border-color: #444; color: #ccc; }
+      .badge-off { background: #333; color: #888; }
+      .toast { background: #f0f0f0; color: #1a1a1a; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Timbrature</h1>
+    <p id="today-date"></p>
+  </div>
+
+  <div class="status-card">
+    <div class="status-label">Stato</div>
+    <span class="status-badge badge-off" id="status-badge">Fuori servizio</span>
+    <div class="elapsed" id="elapsed">--:--:--</div>
+    <div class="start-time" id="start-time-label"></div>
+  </div>
+
+  <button class="btn btn-in" id="btn-in" onclick="clockIn()">Entrata</button>
+  <button class="btn btn-disabled" id="btn-out" onclick="clockOut()" disabled>Uscita</button>
+
+  <div style="margin-top: 2rem;">
+    <div class="section-title">Sessioni registrate</div>
+    <div id="log-container"><div class="log-empty">Nessuna sessione ancora</div></div>
+  </div>
+
+  <div class="actions-row">
+    <button class="btn-sm" onclick="exportCSV()">Esporta CSV</button>
+    <button class="btn-sm" onclick="clearLog()">Svuota log</button>
+  </div>
+
+  <div class="config-section" style="margin-top: 1.5rem;">
+    <label>Google Sheets</label>
+    <p>URL Apps Script per sincronizzazione automatica al clock-out</p>
+    <div class="config-row">
+      <input type="text" id="script-url" placeholder="https://script.google.com/macros/s/...">
+      <button onclick="saveScriptUrl()">Salva</button>
+    </div>
+    <div class="sync-status" id="sync-status"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const STORAGE_KEY = 'timbratura_state';
+  const LOG_KEY = 'timbratura_log';
+  const SCRIPT_URL_KEY = 'timbratura_script_url';
+
+  function getState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { active: false, startTs: null }; }
+    catch { return { active: false, startTs: null }; }
+  }
+  function setState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function getLog() {
+    try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; }
+    catch { return []; }
+  }
+  function saveLog(log) { localStorage.setItem(LOG_KEY, JSON.stringify(log)); }
+  function getScriptUrl() { return localStorage.getItem(SCRIPT_URL_KEY) || ''; }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatTs(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('it-IT') + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+  function formatDuration(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sc = s % 60;
+    return pad(h) + ':' + pad(m) + ':' + pad(sc);
+  }
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  let timerInterval = null;
+  function startTick(startTs) {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      document.getElementById('elapsed').textContent = formatDuration(Date.now() - startTs);
+    }, 1000);
+  }
+
+  function updateUI() {
+    const s = getState();
+    const d = new Date();
+    document.getElementById('today-date').textContent = d.toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const badge = document.getElementById('status-badge');
+    const btnIn = document.getElementById('btn-in');
+    const btnOut = document.getElementById('btn-out');
+    const startLabel = document.getElementById('start-time-label');
+
+    if (s.active && s.startTs) {
+      badge.textContent = 'In servizio';
+      badge.className = 'status-badge badge-on';
+      btnIn.className = 'btn btn-disabled'; btnIn.disabled = true;
+      btnOut.className = 'btn btn-out'; btnOut.disabled = false;
+      startLabel.textContent = 'Entrata: ' + formatTs(s.startTs);
+      document.getElementById('elapsed').textContent = formatDuration(Date.now() - s.startTs);
+      startTick(s.startTs);
+    } else {
+      badge.textContent = 'Fuori servizio';
+      badge.className = 'status-badge badge-off';
+      btnIn.className = 'btn btn-in'; btnIn.disabled = false;
+      btnOut.className = 'btn btn-disabled'; btnOut.disabled = true;
+      startLabel.textContent = '';
+      document.getElementById('elapsed').textContent = '--:--:--';
+      clearInterval(timerInterval);
+    }
+    renderLog();
+    const url = getScriptUrl();
+    if (url) {
+      document.getElementById('script-url').value = url;
+      document.getElementById('sync-status').textContent = 'Sincronizzazione attiva';
+    }
+  }
+
+  function clockIn() {
+    const ts = Date.now();
+    setState({ active: true, startTs: ts });
+    updateUI();
+    showToast('Entrata: ' + formatTs(ts));
+  }
+
+  async function clockOut() {
+    const s = getState();
+    if (!s.active || !s.startTs) return;
+    const endTs = Date.now();
+    const duration = endTs - s.startTs;
+    const entry = { start: s.startTs, end: endTs, duration };
+    const log = getLog();
+    log.unshift(entry);
+    saveLog(log);
+    setState({ active: false, startTs: null });
+    updateUI();
+    showToast('Uscita: ' + formatDuration(duration));
+    const url = getScriptUrl();
+    if (url) await syncToSheets(entry, url);
+  }
+
+  function renderLog() {
+    const log = getLog();
+    const container = document.getElementById('log-container');
+    if (!log.length) { container.innerHTML = '<div class="log-empty">Nessuna sessione ancora</div>'; return; }
+    let html = '<table class="log-table"><thead><tr><th>Data</th><th>Entrata</th><th>Uscita</th><th>Durata</th></tr></thead><tbody>';
+    log.slice(0, 30).forEach(e => {
+      html += '<tr><td>' + new Date(e.start).toLocaleDateString('it-IT') + '</td><td>' + new Date(e.start).toLocaleTimeString('it-IT') + '</td><td>' + new Date(e.end).toLocaleTimeString('it-IT') + '</td><td>' + formatDuration(e.duration) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+
+  function exportCSV() {
+    const log = getLog();
+    if (!log.length) { showToast('Nessun dato da esportare'); return; }
+    let csv = 'Data,Entrata,Uscita,Durata (hh:mm:ss),Durata (minuti)\n';
+    log.forEach(e => {
+      csv += new Date(e.start).toLocaleDateString('it-IT') + ',' +
+             new Date(e.start).toLocaleTimeString('it-IT') + ',' +
+             new Date(e.end).toLocaleTimeString('it-IT') + ',' +
+             formatDuration(e.duration) + ',' +
+             Math.round(e.duration / 60000) + '\n';
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'timbrature.csv'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV scaricato');
+  }
+
+  function clearLog() {
+    if (!confirm('Svuotare tutto il log locale?')) return;
+    saveLog([]);
+    renderLog();
+    showToast('Log svuotato');
+  }
+
+  function saveScriptUrl() {
+    const url = document.getElementById('script-url').value.trim();
+    localStorage.setItem(SCRIPT_URL_KEY, url);
+    document.getElementById('sync-status').textContent = url ? 'Sincronizzazione attiva' : 'URL rimosso';
+    showToast('Salvato');
+  }
+
+  async function syncToSheets(entry, url) {
+    try {
+      const params = new URLSearchParams({
+        data: new Date(entry.start).toLocaleDateString('it-IT'),
+        entrata: new Date(entry.start).toLocaleTimeString('it-IT'),
+        uscita: new Date(entry.end).toLocaleTimeString('it-IT'),
+        durata: formatDuration(entry.duration),
+        durata_minuti: Math.round(entry.duration / 60000)
+      });
+      await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
+      document.getElementById('sync-status').textContent = 'Ultima sync: ' + new Date().toLocaleTimeString('it-IT');
+    } catch(e) {
+      document.getElementById('sync-status').textContent = 'Errore — dati salvati in locale';
+    }
+  }
+
+  updateUI();
+</script>
+</body>
+</html>
