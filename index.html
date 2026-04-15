@@ -85,11 +85,12 @@
 
   const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeelrBFmLTZs9Iw3fj8WXQHrsCkdDkh3AJ01cYn7pIEUjv72w/formResponse';
   const FORM_FIELDS = {
-    data: 'entry.2130742935',
-    entrata: 'entry.1502101229',
-    uscita: 'entry.199129023',
-    durata: 'entry.2099328213',
-    minuti: 'entry.877315540'
+    date: 'entry.2130742935',
+    clockIn: 'entry.1502101229',
+    clockOut: 'entry.199129023',
+    duration: 'entry.2099328213',
+    minutes: 'entry.877315540',
+    totalSeconds: 'entry.794151856'
   };
 
   function getState() {
@@ -196,13 +197,13 @@
   function exportCSV() {
     const log = getLog();
     if (!log.length) { showToast('Nessun dato da esportare'); return; }
-    let csv = 'Data,Entrata,Uscita,Durata (hh:mm:ss),Durata (minuti)\n';
+    let csv = 'Date,Clock In,Clock Out,Duration,Total Seconds\n';
     log.forEach(e => {
       csv += new Date(e.start).toLocaleDateString('it-IT') + ',' +
              new Date(e.start).toLocaleTimeString('it-IT') + ',' +
              new Date(e.end).toLocaleTimeString('it-IT') + ',' +
              formatDuration(e.duration) + ',' +
-             Math.round(e.duration / 60000) + '\n';
+             Math.floor(e.duration / 1000) + '\n';
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -221,12 +222,14 @@
 
   async function syncToForm(entry) {
     try {
+      const totalSeconds = Math.floor(entry.duration / 1000);
       const params = new URLSearchParams({
-        [FORM_FIELDS.data]: new Date(entry.start).toLocaleDateString('it-IT'),
-        [FORM_FIELDS.entrata]: new Date(entry.start).toLocaleTimeString('it-IT'),
-        [FORM_FIELDS.uscita]: new Date(entry.end).toLocaleTimeString('it-IT'),
-        [FORM_FIELDS.durata]: formatDuration(entry.duration),
-        [FORM_FIELDS.minuti]: Math.round(entry.duration / 60000)
+        [FORM_FIELDS.date]: new Date(entry.start).toLocaleDateString('it-IT'),
+        [FORM_FIELDS.clockIn]: new Date(entry.start).toLocaleTimeString('it-IT'),
+        [FORM_FIELDS.clockOut]: new Date(entry.end).toLocaleTimeString('it-IT'),
+        [FORM_FIELDS.duration]: formatDuration(entry.duration),
+        [FORM_FIELDS.minutes]: Math.round(entry.duration / 60000),
+        [FORM_FIELDS.totalSeconds]: totalSeconds
       });
       await fetch(FORM_URL + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
       document.getElementById('sync-status').textContent = 'Sincronizzato: ' + new Date().toLocaleTimeString('it-IT');
