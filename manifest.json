@@ -2,13 +2,13 @@
   "name": "Timbrature",
   "short_name": "Timbrature",
   "description": "Clock in e clock out",
-  "start_url": "/timbrature/index.html",
+  "start_url": "https://eneaqupovisione.github.io/timbrature/index.html",
   "display": "standalone",
   "background_color": "#f5f5f5",
   "theme_color": "#1D9E75",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "https://eneaqupovisione.github.io/timbrature/icon.png",
       "sizes": "192x192",
       "type": "image/png"
     },
